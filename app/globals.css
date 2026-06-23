@@ -755,6 +755,7 @@ p {
 .player-seat {
   position: absolute;
   display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 0.55rem;
   width: min(360px, 42vw);
   min-height: 142px;
@@ -844,7 +845,10 @@ p {
   flex-wrap: wrap;
   gap: 0.34rem;
   min-height: 4.5rem;
+  max-height: 10rem;
   align-items: end;
+  overflow: auto;
+  padding-bottom: 0.2rem;
 }
 
 .playing-card {
@@ -1814,10 +1818,13 @@ p {
   .playing-room-shell .player-seat-3 {
     position: absolute;
     display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
     gap: 0.22rem;
     width: min(12.25rem, 64vw);
     min-height: 4.45rem;
+    max-height: min(34vh, 12rem);
     padding: 0.34rem;
+    overflow: hidden;
   }
 
   .playing-room-shell .player-seat-0 {
@@ -1868,14 +1875,16 @@ p {
 
   .playing-room-shell .hand-row {
     min-height: 2.35rem;
+    max-height: 100%;
     gap: 0.14rem;
-    overflow-x: hidden;
-    flex-wrap: nowrap;
-    padding-bottom: 0;
+    overflow: auto;
+    flex-wrap: wrap;
+    align-content: start;
+    padding-bottom: 0.18rem;
   }
 
   .playing-room-shell .my-seat .hand-row {
-    overflow-x: auto;
+    overflow: auto;
   }
 
   .playing-room-shell .playing-card {
