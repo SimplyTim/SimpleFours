@@ -1,4 +1,5 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getDatabase } from "firebase-admin/database";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { createHash } from "crypto";
 import { readFile, writeFile } from "fs/promises";
@@ -30,22 +31,52 @@ function timestampToIso(value: unknown): string {
   return new Date().toISOString();
 }
 
-function toFirestoreRoom(room: RoomDoc): Record<string, unknown> {
+export function toFirestoreRoom(room: RoomDoc): Record<string, unknown> {
   return {
-    ...room,
+    roomToken: room.roomToken,
+    roomJson: JSON.stringify(room),
     createdAt: isoToTimestamp(room.createdAt),
     updatedAt: isoToTimestamp(room.updatedAt),
     expiresAt: isoToTimestamp(room.expiresAt)
   };
 }
 
-function fromFirestoreRoom(data: FirebaseFirestore.DocumentData): RoomDoc {
+export function fromFirestoreRoom(data: FirebaseFirestore.DocumentData): RoomDoc {
+  if (typeof data.roomJson === "string") {
+    const room = JSON.parse(data.roomJson) as RoomDoc;
+    return {
+      ...room,
+      createdAt: timestampToIso(data.createdAt ?? room.createdAt),
+      updatedAt: timestampToIso(data.updatedAt ?? room.updatedAt),
+      expiresAt: timestampToIso(data.expiresAt ?? room.expiresAt)
+    };
+  }
+
   return {
     ...(data as RoomDoc),
     createdAt: timestampToIso(data.createdAt),
     updatedAt: timestampToIso(data.updatedAt),
     expiresAt: timestampToIso(data.expiresAt)
   };
+}
+
+export function toRealtimeDatabaseRoom(room: RoomDoc): Record<string, unknown> {
+  return {
+    roomToken: room.roomToken,
+    roomJson: JSON.stringify(room),
+    createdAt: room.createdAt,
+    updatedAt: room.updatedAt,
+    expiresAt: room.expiresAt
+  };
+}
+
+export function fromRealtimeDatabaseRoom(data: unknown): RoomDoc {
+  if (!data || typeof data !== "object") throw new Error("Room not found.");
+  const record = data as Record<string, unknown>;
+  if (typeof record.roomJson === "string") {
+    return JSON.parse(record.roomJson) as RoomDoc;
+  }
+  return record as unknown as RoomDoc;
 }
 
 class MemoryRoomStore implements RoomStore {
@@ -145,13 +176,63 @@ class FirestoreRoomStore implements RoomStore {
   }
 }
 
+class RealtimeDatabaseRoomStore implements RoomStore {
+  private roomsRef = getDatabase().ref("rooms");
+
+  async createRoom(room: RoomDoc): Promise<void> {
+    const ref = this.roomsRef.child(room.roomToken);
+    const snapshot = await ref.get();
+    if (snapshot.exists()) {
+      throw new Error("Room token already exists.");
+    }
+    await ref.set(toRealtimeDatabaseRoom(room));
+  }
+
+  async getRoom(roomToken: string): Promise<RoomDoc | null> {
+    const snapshot = await this.roomsRef.child(roomToken).get();
+    if (!snapshot.exists()) return null;
+    const room = fromRealtimeDatabaseRoom(snapshot.val());
+    if (Date.parse(room.expiresAt) <= Date.now()) return null;
+    return room;
+  }
+
+  async updateRoom(roomToken: string, updater: (room: RoomDoc) => RoomDoc): Promise<RoomDoc> {
+    const ref = this.roomsRef.child(roomToken);
+    let updatedRoom: RoomDoc | null = null;
+    let updaterError: unknown = null;
+
+    const result = await ref.transaction(
+      (current) => {
+        if (current === null) return;
+        const room = fromRealtimeDatabaseRoom(current);
+        if (Date.parse(room.expiresAt) <= Date.now()) return;
+
+        try {
+          updatedRoom = updater(room);
+          return toRealtimeDatabaseRoom(updatedRoom);
+        } catch (error) {
+          updaterError = error;
+          return;
+        }
+      },
+      undefined,
+      false
+    );
+
+    if (updaterError) throw updaterError;
+    if (!result.committed || !result.snapshot.exists() || !updatedRoom) throw new Error("Room not found.");
+    return cloneRoom(updatedRoom);
+  }
+}
+
 let cachedStore: RoomStore | null = null;
 
-function firebaseAdminEnv(): { projectId?: string; clientEmail?: string; privateKey?: string } {
+function firebaseAdminEnv(): { projectId?: string; clientEmail?: string; privateKey?: string; databaseURL?: string } {
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
-  return { projectId, clientEmail, privateKey };
+  const databaseURL = process.env.FIREBASE_DATABASE_URL ?? process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL;
+  return { projectId, clientEmail, privateKey, databaseURL };
 }
 
 function hasFirebaseAdminCredentials(): boolean {
@@ -169,6 +250,11 @@ function shouldUseMemoryStore(): boolean {
   return process.env.SIMPLEFOURS_STORE === "memory" || (process.env.NODE_ENV !== "production" && !hasFirebaseAdminCredentials());
 }
 
+function shouldUseRealtimeDatabase(): boolean {
+  const store = process.env.SIMPLEFOURS_STORE;
+  return store === "rtdb" || store === "realtime-database" || Boolean(firebaseAdminEnv().databaseURL);
+}
+
 function initializeFirebase(): void {
   if (getApps().length > 0) return;
 
@@ -178,13 +264,14 @@ function initializeFirebase(): void {
     );
   }
 
-  const { projectId, clientEmail, privateKey } = firebaseAdminEnv();
+  const { projectId, clientEmail, privateKey, databaseURL } = firebaseAdminEnv();
   initializeApp({
     credential: cert({
       projectId: projectId!,
       clientEmail: clientEmail!,
       privateKey: privateKey!
-    })
+    }),
+    ...(databaseURL ? { databaseURL } : {})
   });
 }
 
@@ -196,6 +283,6 @@ export function getRoomStore(): RoomStore {
   }
 
   initializeFirebase();
-  cachedStore = new FirestoreRoomStore();
+  cachedStore = shouldUseRealtimeDatabase() ? new RealtimeDatabaseRoomStore() : new FirestoreRoomStore();
   return cachedStore;
 }
