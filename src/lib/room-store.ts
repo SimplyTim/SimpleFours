@@ -198,29 +198,15 @@ class RealtimeDatabaseRoomStore implements RoomStore {
 
   async updateRoom(roomToken: string, updater: (room: RoomDoc) => RoomDoc): Promise<RoomDoc> {
     const ref = this.roomsRef.child(roomToken);
-    let updatedRoom: RoomDoc | null = null;
-    let updaterError: unknown = null;
+    const snapshot = await ref.get();
+    if (!snapshot.exists()) throw new Error("Room not found.");
 
-    const result = await ref.transaction(
-      (current) => {
-        if (current === null) return;
-        const room = fromRealtimeDatabaseRoom(current);
-        if (Date.parse(room.expiresAt) <= Date.now()) return;
+    const room = fromRealtimeDatabaseRoom(snapshot.val());
+    if (Date.parse(room.expiresAt) <= Date.now()) throw new Error("Room not found.");
 
-        try {
-          updatedRoom = updater(room);
-          return toRealtimeDatabaseRoom(updatedRoom);
-        } catch (error) {
-          updaterError = error;
-          return;
-        }
-      },
-      undefined,
-      false
-    );
-
-    if (updaterError) throw updaterError;
-    if (!result.committed || !result.snapshot.exists() || !updatedRoom) throw new Error("Room not found.");
+    // Room actions are single-turn mutations; read/write avoids RTDB transaction false aborts on cold serverless reads.
+    const updatedRoom = updater(room);
+    await ref.set(toRealtimeDatabaseRoom(updatedRoom));
     return cloneRoom(updatedRoom);
   }
 }
