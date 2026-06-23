@@ -7,7 +7,8 @@ import {
   RotateCcw,
   Scissors,
   Send,
-  Users
+  Users,
+  X
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import CardView from "@/components/CardView";
@@ -37,6 +38,8 @@ interface RoomClientProps {
 }
 
 const SEATS: Seat[] = [0, 1, 2, 3];
+const GAME_POLL_MS = 1_500;
+const WAITING_POLL_MS = 4_000;
 
 export default function RoomClient({ roomToken }: RoomClientProps) {
   const [credentials, setCredentials] = useState<PlayerCredentials | null>(null);
@@ -49,6 +52,12 @@ export default function RoomClient({ roomToken }: RoomClientProps) {
   const seenHangJackIds = useRef(new Set<string>());
   const seenLiftKeys = useRef(new Set<string>());
   const latestCompletedTrickRef = useRef<CompletedTrick | null>(null);
+  const latestStateRef = useRef<SanitizedRoomState | null>(null);
+
+  function syncState(nextState: SanitizedRoomState | null) {
+    latestStateRef.current = nextState;
+    setState(nextState);
+  }
 
   useEffect(() => {
     setCredentials(loadCredentials(roomToken));
@@ -59,28 +68,36 @@ export default function RoomClient({ roomToken }: RoomClientProps) {
     const currentCredentials: PlayerCredentials = credentials;
 
     let cancelled = false;
+    let timeout: number | null = null;
+
+    function nextPollDelay() {
+      return latestStateRef.current?.status === "playing" ? GAME_POLL_MS : WAITING_POLL_MS;
+    }
+
     async function load() {
       try {
         const nextState = await fetchRoomState(roomToken, currentCredentials);
         if (!cancelled) {
-          setState(nextState);
-          setError("");
+          syncState(nextState);
         }
       } catch (caught) {
         if (!cancelled) {
           clearCredentials(roomToken);
           setCredentials(null);
-          setState(null);
+          syncState(null);
           setError(caught instanceof Error ? caught.message : "Could not load room.");
+        }
+      } finally {
+        if (!cancelled) {
+          timeout = window.setTimeout(load, nextPollDelay());
         }
       }
     }
 
     load();
-    const interval = window.setInterval(load, 450);
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      if (timeout !== null) window.clearTimeout(timeout);
     };
   }, [credentials, roomToken]);
 
@@ -128,7 +145,7 @@ export default function RoomClient({ roomToken }: RoomClientProps) {
       };
       saveCredentials(roomToken, nextCredentials);
       setCredentials(nextCredentials);
-      setState(body.state as SanitizedRoomState);
+      syncState(body.state as SanitizedRoomState);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not join room.");
     } finally {
@@ -141,7 +158,7 @@ export default function RoomClient({ roomToken }: RoomClientProps) {
     setBusy(busyLabel);
     setError("");
     try {
-      setState(await postRoomAction(roomToken, credentials, action));
+      syncState(await postRoomAction(roomToken, credentials, action));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Action failed.");
     } finally {
@@ -206,8 +223,19 @@ export default function RoomClient({ roomToken }: RoomClientProps) {
         />
       )}
 
-      {error ? <p className="error-line room-error">{error}</p> : null}
+      {error ? <RoomError message={error} onDismiss={() => setError("")} /> : null}
     </main>
+  );
+}
+
+function RoomError({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <div className="room-error" role="alert">
+      <span>{message}</span>
+      <button type="button" className="icon-button" onClick={onDismiss} aria-label="Dismiss error" title="Dismiss error">
+        <X size={16} />
+      </button>
+    </div>
   );
 }
 

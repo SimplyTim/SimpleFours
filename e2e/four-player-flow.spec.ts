@@ -26,7 +26,7 @@ test("four players can join, take seats, and start a room", async ({ browser }) 
     await chooseSeat(pages[index], roomToken, index);
   }
 
-  await expect(host.getByRole("button", { name: "Start game" })).toBeEnabled();
+  await expect(host.getByRole("button", { name: "Start game" })).toBeEnabled({ timeout: 10_000 });
   await host.getByRole("button", { name: "Start game" }).click();
   await expect(host.getByRole("heading", { name: /Hand 1/ })).toBeVisible();
 });
@@ -84,7 +84,7 @@ test("host can fill seats with bots and start", async ({ page }) => {
   }
 
   await expect(page.getByText("Bot player")).toHaveCount(3);
-  await expect(page.getByRole("button", { name: "Start game" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Start game" })).toBeEnabled({ timeout: 10_000 });
   await page.getByRole("button", { name: "Start game" }).click();
   await expect(page.getByRole("heading", { name: /Hand 1/ })).toBeVisible();
 });
