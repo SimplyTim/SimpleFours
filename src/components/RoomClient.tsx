@@ -379,13 +379,13 @@ function GameView({ state, busy, showEmotes, roundSummary, liftAnimation, onActi
   const roundSummaryAction = state.availableActions.find((action) => action.type === "ack-round-summary") ?? null;
   const tablePromptActions = state.availableActions.filter((action) => action.type !== "ack-round-summary");
   const boardIsBlocked = tablePromptActions.length > 0;
-  const shouldKeepOwnHandClear = tablePromptActions.some((action) => action.type === "stand" || action.type === "beg");
+  const shouldKeepOwnHandClear = boardIsBlocked && state.game.myHand.length > 0;
   const waitingMessage = !boardIsBlocked && !roundSummary ? waitingStatusMessage(state) : null;
   const summaryWaitingMessage =
     state.game.phase === "round-summary" && !roundSummaryAction ? "Waiting for the host to continue." : null;
 
   return (
-    <section className="room-grid game-grid">
+    <section className={`room-grid game-grid ${waitingMessage ? "has-floating-status" : ""}`}>
       <div className="table-zone">
         <div className="game-table">
           <div
@@ -412,10 +412,10 @@ function GameView({ state, busy, showEmotes, roundSummary, liftAnimation, onActi
             <GameOverCallout winnerTeam={state.game.winnerTeam} scores={state.game.scores} />
           ) : null}
           <TableDecisionPrompt actions={tablePromptActions} busy={busy} onAction={onAction} />
-          {waitingMessage ? <WaitingStatusBanner message={waitingMessage} /> : null}
           {showEmotes && !boardIsBlocked && !roundSummary ? <BoardCallMenu busy={busy} onAction={onAction} /> : null}
         </div>
       </div>
+      {waitingMessage ? <WaitingStatusBanner message={waitingMessage} /> : null}
 
       <aside className="side-rail">
         <PlayersPanel state={state} busy={busy} onAction={onAction} />

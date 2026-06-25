@@ -415,6 +415,14 @@ p {
   align-items: start;
 }
 
+.game-grid {
+  position: relative;
+}
+
+.game-grid.has-floating-status .side-rail {
+  padding-top: 3.25rem;
+}
+
 .table-zone {
   min-height: calc(100vh - 7.5rem);
   border: 1px solid rgba(255, 251, 232, 0.18);
@@ -431,6 +439,17 @@ p {
 .side-rail {
   display: grid;
   gap: 1rem;
+}
+
+.game-grid > .table-zone {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.game-grid > .table-zone > .game-table {
+  height: auto;
+  min-height: 0;
 }
 
 @media (min-width: 941px) {
@@ -486,15 +505,6 @@ p {
     max-height: min(20vh, 180px);
   }
 
-  .player-seat {
-    width: min(330px, 38vw);
-    min-height: 124px;
-    padding: 0.62rem;
-  }
-
-  .hand-row {
-    min-height: 3.9rem;
-  }
 }
 
 .lobby-zone {
@@ -936,6 +946,150 @@ p {
   pointer-events: none;
 }
 
+.game-grid .table-play-surface {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(9.5rem, max-content) minmax(16rem, 1fr) minmax(9.5rem, max-content);
+  grid-template-rows: auto minmax(9rem, 1fr) auto;
+  gap: clamp(0.32rem, 0.8vw, 0.6rem);
+  align-items: center;
+  justify-items: center;
+}
+
+.game-grid .player-seat,
+.game-grid .player-seat-0,
+.game-grid .player-seat-1,
+.game-grid .player-seat-2,
+.game-grid .player-seat-3 {
+  position: relative;
+  inset: auto;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 0;
+  transform: none;
+}
+
+.game-grid .player-seat {
+  gap: 0.3rem;
+  padding: 0.48rem;
+  overflow: hidden;
+}
+
+.game-grid .player-seat-0,
+.game-grid .player-seat-2 {
+  grid-column: 2;
+  width: max-content;
+  max-width: 100%;
+}
+
+.game-grid .player-seat-0 {
+  grid-row: 1;
+  align-self: start;
+}
+
+.game-grid .player-seat-2 {
+  grid-row: 3;
+  align-self: end;
+}
+
+.game-grid .player-seat-1,
+.game-grid .player-seat-3 {
+  grid-row: 1 / 4;
+  width: min(10.75rem, 20vw);
+  max-height: 100%;
+  align-self: center;
+}
+
+.game-grid .player-seat-1 {
+  grid-column: 1;
+  justify-self: start;
+}
+
+.game-grid .player-seat-3 {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.game-grid .player-seat-0 .hand-row,
+.game-grid .player-seat-2 .hand-row {
+  flex-wrap: nowrap;
+  min-height: 4.45rem;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  align-items: end;
+  align-content: end;
+}
+
+.game-grid .player-seat-1 .hand-row,
+.game-grid .player-seat-3 .hand-row {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  min-height: 4.45rem;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  align-items: center;
+  align-content: center;
+  padding-right: 0.18rem;
+  scrollbar-gutter: stable;
+}
+
+.game-grid .player-seat-1 .playing-card,
+.game-grid .player-seat-3 .playing-card {
+  width: 2.65rem;
+  height: 3.65rem;
+  font-size: 0.78rem;
+}
+
+.game-grid .player-seat-1 .playing-card + .playing-card,
+.game-grid .player-seat-3 .playing-card + .playing-card {
+  margin-top: -1.15rem;
+}
+
+.game-grid .player-seat-1 .card-suit-main,
+.game-grid .player-seat-3 .card-suit-main {
+  font-size: 1.28rem;
+}
+
+.game-grid .player-seat-1 .card-corner,
+.game-grid .player-seat-3 .card-corner {
+  font-size: 0.58rem;
+}
+
+.game-grid .player-seat-1 .card-corner strong,
+.game-grid .player-seat-3 .card-corner strong {
+  font-size: 0.68rem;
+}
+
+.game-grid .seat-title span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-grid .badges {
+  min-height: 1.05rem;
+  gap: 0.2rem;
+}
+
+.game-grid .badges span {
+  padding: 0.1rem 0.34rem;
+}
+
+.game-grid .table-center {
+  grid-column: 2;
+  grid-row: 2;
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: 100%;
+  min-width: 14rem;
+  min-height: 9rem;
+}
+
 .table-decision-prompt {
   position: absolute;
   z-index: 7;
@@ -1198,6 +1352,15 @@ p {
   background: var(--coral);
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--coral) 42%, transparent);
   animation: waitingPulse 1.2s ease-out infinite;
+}
+
+.game-grid > .waiting-status-banner {
+  top: 0;
+  right: 0;
+  left: auto;
+  width: fit-content;
+  max-width: min(28rem, 350px);
+  transform: none;
 }
 
 .score-log {
@@ -1836,7 +1999,8 @@ p {
   .playing-room-shell .player-seat-1 {
     top: 50%;
     left: 0;
-    width: min(9rem, 40vw);
+    width: min(6.5rem, 27vw);
+    max-height: min(52vh, 20rem);
     transform: translateY(-50%);
   }
 
@@ -1849,7 +2013,8 @@ p {
   .playing-room-shell .player-seat-3 {
     top: 50%;
     right: 0;
-    width: min(9rem, 40vw);
+    width: min(6.5rem, 27vw);
+    max-height: min(52vh, 20rem);
     transform: translateY(-50%);
   }
 
@@ -1857,6 +2022,13 @@ p {
     gap: 0.25rem;
     font-size: 0.74rem;
     line-height: 1;
+  }
+
+  .playing-room-shell .seat-title span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .playing-room-shell .seat-title small,
@@ -1885,6 +2057,17 @@ p {
 
   .playing-room-shell .my-seat .hand-row {
     overflow: auto;
+  }
+
+  .playing-room-shell .player-seat-1 .hand-row,
+  .playing-room-shell .player-seat-3 .hand-row {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: center;
+    align-content: center;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
   .playing-room-shell .playing-card {
@@ -1931,6 +2114,101 @@ p {
     transform: none;
   }
 
+  .playing-room-shell .game-grid .table-play-surface {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: minmax(4.35rem, max-content) minmax(7rem, 1fr) minmax(4.35rem, max-content);
+    grid-template-rows: auto minmax(8.5rem, 1fr) auto;
+    gap: 0.24rem;
+    align-items: center;
+    justify-items: center;
+  }
+
+  .playing-room-shell .game-grid .player-seat,
+  .playing-room-shell .game-grid .player-seat-0,
+  .playing-room-shell .game-grid .player-seat-1,
+  .playing-room-shell .game-grid .player-seat-2,
+  .playing-room-shell .game-grid .player-seat-3 {
+    position: relative;
+    inset: auto;
+    min-width: 0;
+    min-height: 0;
+    max-width: 100%;
+    max-height: 100%;
+    transform: none;
+  }
+
+  .playing-room-shell .game-grid .player-seat-0,
+  .playing-room-shell .game-grid .player-seat-2 {
+    grid-column: 1 / -1;
+    width: max-content;
+  }
+
+  .playing-room-shell .game-grid .player-seat-0 {
+    grid-row: 1;
+    align-self: start;
+  }
+
+  .playing-room-shell .game-grid .player-seat-2 {
+    grid-row: 3;
+    align-self: end;
+  }
+
+  .playing-room-shell .game-grid .player-seat-1,
+  .playing-room-shell .game-grid .player-seat-3 {
+    grid-row: 2;
+    width: min(4.85rem, 24vw);
+    max-height: 100%;
+  }
+
+  .playing-room-shell .game-grid .player-seat-1 {
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  .playing-room-shell .game-grid .player-seat-3 {
+    grid-column: 3;
+    justify-self: end;
+  }
+
+  .playing-room-shell .game-grid .player-seat-0 .hand-row,
+  .playing-room-shell .game-grid .player-seat-2 .hand-row {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    align-items: end;
+    align-content: end;
+  }
+
+  .playing-room-shell .game-grid .player-seat-1 .hand-row,
+  .playing-room-shell .game-grid .player-seat-3 .hand-row {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    overflow-x: hidden;
+    overflow-y: auto;
+    align-items: center;
+    align-content: center;
+    scrollbar-gutter: stable;
+  }
+
+  .playing-room-shell .game-grid .player-seat-1 .playing-card + .playing-card,
+  .playing-room-shell .game-grid .player-seat-3 .playing-card + .playing-card {
+    margin-top: -1.05rem;
+  }
+
+  .playing-room-shell .game-grid .table-center {
+    grid-column: 2;
+    grid-row: 2;
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: 100%;
+    min-width: 7rem;
+    min-height: 8.5rem;
+  }
+
   .playing-room-shell .table-decision-prompt,
   .playing-room-shell .round-summary-overlay,
   .playing-room-shell .game-over-callout,
@@ -1955,6 +2233,21 @@ p {
     justify-content: center;
     max-width: 92%;
     transform: translate(-50%, -50%);
+  }
+
+  .playing-room-shell .game-grid > .waiting-status-banner {
+    position: fixed;
+    z-index: 20;
+    top: 0.4rem;
+    right: auto;
+    left: 50%;
+    width: fit-content;
+    max-width: min(20rem, calc(100vw - 5.4rem));
+    transform: translateX(-50%);
+    justify-content: center;
+    padding: 0.36rem 0.55rem;
+    font-size: 0.64rem;
+    line-height: 1.1;
   }
 
   .playing-room-shell .board-call-menu {
