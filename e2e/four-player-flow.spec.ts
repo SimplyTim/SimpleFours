@@ -111,6 +111,21 @@ test("hang jack overlay clears while room state keeps polling", async ({ page })
   await expect(page.locator(".hang-overlay")).toBeHidden({ timeout: 5_000 });
 });
 
+test("join room opens a code modal with uppercase entry", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Join room" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Join room" });
+  await expect(dialog).toBeVisible();
+
+  const codeInput = dialog.getByLabel("Room code");
+  await expect(codeInput).toBeFocused();
+  await expect(codeInput).toHaveAttribute("autocapitalize", "characters");
+  await codeInput.fill("abc123");
+  await expect(codeInput).toHaveValue("ABC123");
+  await expect(page.locator(".home-card").getByLabel("Code")).toHaveCount(0);
+});
+
 test("mobile playing layout keeps status clear and side hands vertical", async ({ page }) => {
   const roomToken = "LAYOUT1";
 

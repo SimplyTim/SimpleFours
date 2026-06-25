@@ -1,8 +1,8 @@
 "use client";
 
-import { DoorOpen, Plus, Spade } from "lucide-react";
+import { DoorOpen, Plus, Spade, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { saveCredentials } from "@/lib/client-room";
 
@@ -10,9 +10,15 @@ export default function HomePage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [roomToken, setRoomToken] = useState("");
-  const [joinMode, setJoinMode] = useState(false);
+  const [joinModalOpen, setJoinModalOpen] = useState(false);
   const [busy, setBusy] = useState<"create" | "join" | null>(null);
   const [error, setError] = useState("");
+  const roomCodeInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!joinModalOpen) return;
+    roomCodeInputRef.current?.focus();
+  }, [joinModalOpen]);
 
   async function createRoom() {
     setBusy("create");
@@ -33,11 +39,6 @@ export default function HomePage() {
 
   async function joinRoom(event?: FormEvent) {
     event?.preventDefault();
-    if (!joinMode) {
-      setJoinMode(true);
-      setError("");
-      return;
-    }
 
     setBusy("join");
     setError("");
@@ -54,12 +55,24 @@ export default function HomePage() {
         playerId: body.playerId,
         playerSecret: body.playerSecret
       });
+      setJoinModalOpen(false);
       router.push(`/room/${token}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not join room.");
     } finally {
       setBusy(null);
     }
+  }
+
+  function openJoinModal() {
+    setJoinModalOpen(true);
+    setError("");
+  }
+
+  function closeJoinModal() {
+    if (busy !== null) return;
+    setJoinModalOpen(false);
+    setError("");
   }
 
   return (
@@ -73,37 +86,62 @@ export default function HomePage() {
           <ThemeToggle />
         </div>
 
-        <form className="panel compact-panel home-card" onSubmit={joinRoom}>
+        <div className="panel compact-panel home-card">
           <h1>Play with friends</h1>
           <label>
             Name
             <input value={name} onChange={(event) => setName(event.target.value)} maxLength={24} placeholder="Player name" />
           </label>
-          {joinMode ? (
-            <label>
-              Code
-              <input
-                value={roomToken}
-                onChange={(event) => setRoomToken(event.target.value.toUpperCase())}
-                maxLength={10}
-                placeholder="ABCD234"
-                required
-              />
-            </label>
-          ) : null}
           <div className="home-actions">
             <button type="button" className="primary-button" disabled={busy !== null} onClick={createRoom}>
               <Plus size={18} />
               {busy === "create" ? "Creating" : "Create room"}
             </button>
-            <button className="secondary-button" disabled={busy !== null}>
+            <button type="button" className="secondary-button" disabled={busy !== null} onClick={openJoinModal}>
               <DoorOpen size={18} />
-              {busy === "join" ? "Joining" : "Join room"}
+              Join room
             </button>
           </div>
-        </form>
+        </div>
 
-        {error ? <p className="error-line">{error}</p> : null}
+        {joinModalOpen ? (
+          <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && closeJoinModal()}>
+            <form className="panel join-room-modal" role="dialog" aria-modal="true" aria-labelledby="join-room-title" onSubmit={joinRoom}>
+              <div className="modal-title-row">
+                <h2 id="join-room-title">Join room</h2>
+                <button type="button" className="icon-button" onClick={closeJoinModal} aria-label="Close join room dialog" title="Close">
+                  <X size={17} />
+                </button>
+              </div>
+              <label>
+                Room code
+                <input
+                  ref={roomCodeInputRef}
+                  value={roomToken}
+                  onChange={(event) => setRoomToken(event.target.value.toUpperCase())}
+                  maxLength={10}
+                  placeholder="ABCD234"
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  spellCheck={false}
+                  required
+                />
+              </label>
+              <div className="modal-actions">
+                <button type="button" className="secondary-button" disabled={busy !== null} onClick={closeJoinModal}>
+                  Cancel
+                </button>
+                <button className="primary-button" disabled={busy !== null}>
+                  <DoorOpen size={18} />
+                  {busy === "join" ? "Joining" : "Join room"}
+                </button>
+              </div>
+              {error ? <p className="error-line">{error}</p> : null}
+            </form>
+          </div>
+        ) : null}
+
+        {error && !joinModalOpen ? <p className="error-line">{error}</p> : null}
       </section>
     </main>
   );

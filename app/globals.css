@@ -195,6 +195,33 @@ p {
   width: min(420px, 100%);
 }
 
+.modal-backdrop {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(13, 5, 6, 0.54);
+  padding: 1rem;
+}
+
+.join-room-modal {
+  width: min(420px, 100%);
+}
+
+.modal-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.modal-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.65rem;
+}
+
 .panel h1,
 .panel h2 {
   display: inline-flex;
