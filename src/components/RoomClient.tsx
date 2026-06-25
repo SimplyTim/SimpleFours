@@ -903,7 +903,7 @@ function iconForAction(actionType: PublicAction["type"]) {
 function tablePromptTitle(actions: PublicAction[]): string {
   const types = new Set(actions.map((action) => action.type));
   if (types.has("stand") || types.has("beg")) return "Stand or beg?";
-  if (types.has("take-one") || types.has("run-cards")) return "Take one or run?";
+  if (types.has("take-one") || types.has("run-cards")) return "Give one or run the deck?";
   if (types.has("deck-exhausted-choice")) return "Resolve the exhausted deck";
   if (types.has("cut")) return "Cut the deck";
   if (types.has("rematch")) return "Start a new game?";
@@ -914,7 +914,7 @@ function waitingStatusMessage(state: SanitizedRoomState): string | null {
   const phase = state.game.phase;
   if (phase === "awaiting-cut") return `Waiting for ${seatName(state, state.game.cutSeat)} to cut.`;
   if (phase === "begging") return `Waiting for ${seatName(state, seatToDealerRight(state.game.dealerSeat))} to stand or beg.`;
-  if (phase === "dealer-decision") return `Waiting for ${seatName(state, state.game.dealerSeat)} to take one or run the cards.`;
+  if (phase === "dealer-decision") return `Waiting for ${seatName(state, state.game.dealerSeat)} to give one or run the deck.`;
   if (phase === "running") return `Waiting for ${seatName(state, state.game.dealerSeat)} to keep running.`;
   if (phase === "deck-exhausted") return `Waiting for ${seatName(state, state.game.dealerSeat)} to resolve the deck.`;
   if (phase === "playing") {

@@ -210,6 +210,8 @@ test("dealer decision keeps the dealer hand clear after a beg", async ({ page })
 
   await page.goto(`/room/${roomToken}`);
   await expect(page.locator(".table-decision-prompt")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Give One" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Run the Deck" })).toBeVisible();
   await expect(page.locator(".table-play-surface")).toHaveClass(/show-own-hand-during-prompt/);
 
   const dealerSeatStyle = await page.locator(".my-seat").evaluate((seat) => {
@@ -496,8 +498,8 @@ function mockDealerDecisionState(roomToken: string) {
   state.players[0] = dealer;
   state.seats[0] = { seat: 0, team: 0, player: dealer, cardCount: 9 };
   state.availableActions = [
-    { type: "take-one", label: "Take one" },
-    { type: "run-cards", label: "Run the cards" }
+    { type: "take-one", label: "Give One" },
+    { type: "run-cards", label: "Run the Deck" }
   ];
   state.game.phase = "dealer-decision";
   state.game.dealerSeat = 0;

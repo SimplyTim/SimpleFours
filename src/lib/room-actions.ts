@@ -576,7 +576,7 @@ function buildAvailableActions(room: RoomDoc, player: PlayerRecord): PublicActio
   }
 
   if (game.phase === "dealer-decision" && player.seat === game.dealerSeat) {
-    actions.push({ type: "take-one", label: "Take one" }, { type: "run-cards", label: "Run the cards" });
+    actions.push({ type: "take-one", label: "Give One" }, { type: "run-cards", label: "Run the Deck" });
   }
 
   if (game.phase === "running" && player.seat === game.dealerSeat) {
