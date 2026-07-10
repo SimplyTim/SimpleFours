@@ -27,6 +27,7 @@ import {
   type CompletedTrick,
   type RoomEvent,
   type PublicAction,
+  type PublicSeat,
   type RoundSummaryAward,
   type RoundSummary,
   type SanitizedRoomState,
@@ -99,6 +100,30 @@ export default function RoomClient({ roomToken }: RoomClientProps) {
       cancelled = true;
       if (timeout !== null) window.clearTimeout(timeout);
     };
+  }, [credentials, roomToken]);
+
+  useEffect(() => {
+    if (!credentials) return;
+    const currentCredentials: PlayerCredentials = credentials;
+
+    function leaveSeatOnPageExit() {
+      const latestState = latestStateRef.current;
+      if (latestState?.status !== "playing" || latestState.me.seat === null) return;
+
+      void fetch(`/api/rooms/${encodeURIComponent(roomToken)}/action`, {
+        method: "POST",
+        keepalive: true,
+        headers: {
+          "content-type": "application/json",
+          "x-player-id": currentCredentials.playerId,
+          "x-player-secret": currentCredentials.playerSecret
+        },
+        body: JSON.stringify({ type: "leave-seat" })
+      });
+    }
+
+    window.addEventListener("pagehide", leaveSeatOnPageExit);
+    return () => window.removeEventListener("pagehide", leaveSeatOnPageExit);
   }, [credentials, roomToken]);
 
   const latestHangJack = useMemo(() => state?.events.filter((event) => event.type === "hangJack").at(-1) ?? null, [state]);
@@ -271,6 +296,10 @@ function ScoreBoard({ state }: { state: SanitizedRoomState }) {
 function TrumpPanel({ state }: { state: SanitizedRoomState }) {
   const trump = state.game.trump ?? state.game.proposedTrump;
   const label = state.game.trump ? "Trump" : state.game.proposedTrump ? "Proposed trump" : "Trump";
+  const activeKickIndex = state.game.kickCards.reduce(
+    (activeIndex, card, index) => (trump === null || card.suit === trump ? index : activeIndex),
+    state.game.kickCards.length - 1
+  );
 
   return (
     <div className="trump-panel" aria-label="Trump and kicked cards">
@@ -279,11 +308,13 @@ function TrumpPanel({ state }: { state: SanitizedRoomState }) {
         <strong>{trump ? `${suitSymbol(trump)} ${trump}` : "Not set"}</strong>
       </div>
       {state.game.kickCards.length > 0 ? (
-        <div className="kick-card-strip" aria-label="Kicked cards not dealt">
-          <span>Kicks not dealt</span>
+        <div className="kick-card-strip" aria-label="Kicked card">
+          <span>Kicked card</span>
           <div>
-            {state.game.kickCards.map((card) => (
-              <CardView key={card.id} card={card} />
+            {state.game.kickCards.map((card, index) => (
+              <span key={card.id} className={`kick-card-item ${index === activeKickIndex ? "active-kick-card" : "faded-kick-card"}`}>
+                <CardView card={card} />
+              </span>
             ))}
           </div>
         </div>
@@ -378,8 +409,9 @@ interface GameViewProps {
 function GameView({ state, busy, showEmotes, roundSummary, liftAnimation, onAction }: GameViewProps) {
   const roundSummaryAction = state.availableActions.find((action) => action.type === "ack-round-summary") ?? null;
   const tablePromptActions = state.availableActions.filter((action) => action.type !== "ack-round-summary");
-  const boardIsBlocked = tablePromptActions.length > 0;
-  const shouldKeepOwnHandClear = boardIsBlocked && state.game.myHand.length > 0;
+  const missingSeats = state.status === "playing" ? state.seats.filter((seat) => !seat.player) : [];
+  const boardIsBlocked = tablePromptActions.length > 0 || missingSeats.length > 0;
+  const shouldKeepOwnHandClear = tablePromptActions.length > 0 && state.game.myHand.length > 0;
   const waitingMessage = !boardIsBlocked && !roundSummary ? waitingStatusMessage(state) : null;
   const summaryWaitingMessage =
     state.game.phase === "round-summary" && !roundSummaryAction ? "Waiting for the host to continue." : null;
@@ -408,6 +440,7 @@ function GameView({ state, busy, showEmotes, roundSummary, liftAnimation, onActi
             busy={busy}
             onAction={onAction}
           />
+          <MissingSeatOverlay missingSeats={missingSeats} meSeat={state.me.seat} busy={busy} onAction={onAction} />
           {state.game.winnerTeam !== null && !roundSummary ? (
             <GameOverCallout winnerTeam={state.game.winnerTeam} scores={state.game.scores} />
           ) : null}
@@ -423,6 +456,48 @@ function GameView({ state, busy, showEmotes, roundSummary, liftAnimation, onActi
         <EventLog state={state} />
       </aside>
     </section>
+  );
+}
+
+function MissingSeatOverlay({
+  missingSeats,
+  meSeat,
+  busy,
+  onAction
+}: {
+  missingSeats: PublicSeat[];
+  meSeat: Seat | null;
+  busy: string | null;
+  onAction: (action: Parameters<typeof postRoomAction>[2], busyLabel?: string) => Promise<void>;
+}) {
+  if (missingSeats.length === 0) return null;
+
+  const seatNames = missingSeats.map((seat) => `Seat ${seat.seat + 1}`);
+  const seatText = seatNames.length === 1 ? seatNames[0] : `${seatNames.slice(0, -1).join(", ")} and ${seatNames.at(-1)}`;
+
+  return (
+    <div className="missing-seat-overlay" role="status" aria-live="polite">
+      <div>
+        <p className="eyebrow">Player left</p>
+        <h2>Game paused</h2>
+        <p>{`Waiting for ${seatText} to be filled.`}</p>
+      </div>
+      {meSeat === null ? (
+        <div className="missing-seat-actions">
+          {missingSeats.map((seat) => (
+            <button
+              key={seat.seat}
+              className="primary-button"
+              disabled={busy !== null}
+              onClick={() => onAction({ type: "choose-seat", seat: seat.seat }, `seat-${seat.seat}`)}
+            >
+              <DoorOpen size={17} />
+              Take Seat {seat.seat + 1}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

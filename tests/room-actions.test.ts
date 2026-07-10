@@ -7,6 +7,8 @@ import {
   createGuestPlayer,
   createHostPlayer,
   createRoomDoc,
+  missingGameSeats,
+  refreshRoomPresence,
   sanitizeRoomForPlayer,
   ttlFrom
 } from "@/lib/room-actions";
@@ -124,6 +126,59 @@ describe("room actions", () => {
 
     expect(activePlayer?.isBot).not.toBe(true);
     expect(advanced.events.some((event) => event.message.includes("Bot chose"))).toBe(true);
+  });
+
+  it("pauses an active game when a player leaves and lets a replacement take the seat", () => {
+    let room = readyRoom();
+    room = applyRoomAction(room, "host", { type: "start-game" }, later, () => 0);
+
+    room = applyRoomAction(room, "p1", { type: "leave-seat" }, later);
+    expect(room.players.find((player) => player.id === "p1")?.seat).toBeNull();
+    expect(missingGameSeats(room)).toEqual([1]);
+    expect(sanitizeRoomForPlayer(room, "host").seats[1].player).toBeNull();
+    expect(() => applyRoomAction(room, "host", { type: "cut" }, later)).toThrow("paused");
+
+    const replacement = createGuestPlayer("p4", "Replacement", "secret-4", later);
+    room.players.push(replacement);
+    room = applyRoomAction(room, "p4", { type: "choose-seat", seat: 1 }, later);
+
+    expect(room.players.find((player) => player.id === "p4")?.seat).toBe(1);
+    expect(missingGameSeats(room)).toEqual([]);
+  });
+
+  it("automatically restores a returning player to their abandoned seat when it is still open", () => {
+    let room = readyRoom();
+    room = applyRoomAction(room, "host", { type: "start-game" }, later, () => 0);
+    room.players.forEach((player) => {
+      player.lastSeenAt = later;
+    });
+    room = applyRoomAction(room, "p1", { type: "leave-seat" }, later);
+
+    room = refreshRoomPresence(room, "p1", afterCardHold);
+
+    expect(room.players.find((player) => player.id === "p1")?.seat).toBe(1);
+    expect(missingGameSeats(room)).toEqual([]);
+    expect(room.events.some((event) => event.message.includes("rejoined Seat 2"))).toBe(true);
+  });
+
+  it("marks stale players as left and pauses bot automation", () => {
+    let room = createRoomDoc("ROOM123", createHostPlayer("host", "Host", "secret-host", now), now);
+    room = applyRoomAction(room, "host", { type: "choose-seat", seat: 0 }, later);
+    room = applyRoomAction(room, "host", { type: "add-bot", seat: 1 }, later);
+    room.players.push(createGuestPlayer("p2", "Two", "secret-2", now));
+    room.players.at(-1)!.seat = 2;
+    room = applyRoomAction(room, "host", { type: "add-bot", seat: 3 }, later);
+    room = applyRoomAction(room, "host", { type: "start-game" }, later, () => 0);
+    room.game!.dealerSeat = 2;
+    room.game!.cutSeat = 1;
+    room.game!.turnSeat = 1;
+
+    room = refreshRoomPresence(room, "host", later);
+    const advanced = advanceBots(room, later, () => 0);
+
+    expect(missingGameSeats(advanced)).toEqual([2]);
+    expect(advanced.game?.turnSeat).toBe(1);
+    expect(advanced.events.some((event) => event.message.includes("Two left Seat 3"))).toBe(true);
   });
 
   it("keeps cards clickable for the winner after the first lift settles", () => {

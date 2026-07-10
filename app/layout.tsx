@@ -26,6 +26,12 @@ try {
       <body>
         <FirebaseAnalytics />
         {children}
+        <footer className="site-footer">
+          {"Made by "}
+          <a href="https://github.com/SimplyTim" target="_blank" rel="noreferrer">
+            SimplyTim
+          </a>
+        </footer>
       </body>
     </html>
   );

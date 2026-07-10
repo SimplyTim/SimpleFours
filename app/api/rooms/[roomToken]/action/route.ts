@@ -8,7 +8,7 @@ import {
   readJson,
   resolveParams
 } from "@/lib/api-utils";
-import { advanceRoom, applyRoomAction, authenticateRoomPlayer, sanitizeRoomForPlayer } from "@/lib/room-actions";
+import { advanceRoom, applyRoomAction, authenticateRoomPlayer, refreshRoomPresence, sanitizeRoomForPlayer } from "@/lib/room-actions";
 import { getRoomStore } from "@/lib/room-store";
 
 export const runtime = "nodejs";
@@ -29,7 +29,8 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     const room = await getRoomStore().updateRoom(roomToken, (current) => {
       const player = authenticateRoomPlayer(current, playerId, playerSecret);
       if (!player) throw new ApiError("Invalid player credentials.", 401);
-      const readyRoom = advanceRoom(current, now);
+      const presentRoom = refreshRoomPresence(current, player.id, now);
+      const readyRoom = advanceRoom(presentRoom, now);
       const actedRoom = applyRoomAction(readyRoom, player.id, action, now);
       return advanceRoom(actedRoom, now);
     });

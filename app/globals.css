@@ -70,6 +70,31 @@ body {
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+.site-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  color: color-mix(in srgb, var(--felt-text) 82%, transparent);
+  font-size: 0.82rem;
+  font-weight: 760;
+  text-align: center;
+}
+
+.site-footer a {
+  color: var(--felt-text);
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  text-decoration: underline;
+}
+
+.playing-room-shell + .site-footer {
+  display: none;
+}
+
 button,
 input,
 select {
@@ -125,6 +150,11 @@ p {
 .home-shell {
   display: grid;
   place-items: center;
+  min-height: calc(100dvh - 2.75rem);
+}
+
+.room-shell:not(.playing-room-shell) {
+  min-height: calc(100dvh - 2.75rem);
 }
 
 .home-table {
@@ -435,6 +465,23 @@ p {
     0 0 0 1px rgba(255, 255, 255, 0.45);
 }
 
+.kick-card-item {
+  display: inline-grid;
+  transition:
+    opacity 160ms ease,
+    filter 160ms ease,
+    transform 160ms ease;
+}
+
+.faded-kick-card {
+  opacity: 0.38;
+  filter: saturate(0.58);
+}
+
+.active-kick-card {
+  transform: translateY(-0.08rem);
+}
+
 .room-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 350px);
@@ -456,7 +503,6 @@ p {
   border-radius: 24px;
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.1), transparent 38%),
-    linear-gradient(45deg, transparent 0 45%, rgba(255, 255, 255, 0.72) 45% 47%, #08080a 47% 58%, rgba(255, 255, 255, 0.72) 58% 60%, transparent 60%),
     radial-gradient(circle at 50% 50%, var(--felt) 0%, var(--felt-mid) 44%, var(--felt-dark) 78%);
   box-shadow: var(--shadow-table);
   padding: clamp(0.75rem, 1.8vw, 1.2rem);
@@ -487,6 +533,10 @@ p {
     min-height: 0;
     overflow: hidden;
     padding: clamp(0.65rem, 1.2vw, 1rem);
+  }
+
+  .room-shell:not(.playing-room-shell) {
+    height: calc(100dvh - 2.75rem);
   }
 
   .room-header {
@@ -894,12 +944,16 @@ p {
   place-items: center;
   width: 3.2rem;
   height: 4.45rem;
+  flex: 0 0 auto;
   border: 1px solid rgba(23, 32, 27, 0.18);
   border-radius: 0;
   background: #fffdf7;
   box-shadow: 0 4px 12px rgba(23, 32, 27, 0.16);
   font-weight: 930;
-  padding: 0.35rem;
+  line-height: 1;
+  padding: 0.3rem;
+  text-align: center;
+  user-select: none;
 }
 
 .playing-card.small-card {
@@ -913,36 +967,39 @@ p {
   height: 4.25rem;
 }
 
-.card-corner {
-  position: absolute;
+.card-face {
   display: grid;
+  gap: 0.1rem;
   justify-items: center;
+  min-width: 0;
+  width: 100%;
   line-height: 1;
-  font-size: 0.72rem;
 }
 
-.card-corner strong {
-  font-size: 0.88rem;
-}
-
-.top-corner {
-  top: 0.32rem;
-  left: 0.32rem;
-}
-
-.bottom-corner {
-  right: 0.32rem;
-  bottom: 0.32rem;
-  transform: rotate(180deg);
+.card-rank {
+  font-size: 1.08rem;
+  line-height: 0.95;
 }
 
 .card-suit-main {
-  font-size: 1.8rem;
+  font-size: 1.95rem;
   line-height: 1;
+}
+
+.small-card .card-rank {
+  font-size: 0.86rem;
 }
 
 .small-card .card-suit-main {
   font-size: 1.35rem;
+}
+
+.table-card .card-rank {
+  font-size: 1rem;
+}
+
+.table-card .card-suit-main {
+  font-size: 1.8rem;
 }
 
 .playing-card.red-card {
@@ -1077,17 +1134,12 @@ p {
 
 .game-grid .player-seat-1 .card-suit-main,
 .game-grid .player-seat-3 .card-suit-main {
-  font-size: 1.28rem;
+  font-size: 1.38rem;
 }
 
-.game-grid .player-seat-1 .card-corner,
-.game-grid .player-seat-3 .card-corner {
-  font-size: 0.58rem;
-}
-
-.game-grid .player-seat-1 .card-corner strong,
-.game-grid .player-seat-3 .card-corner strong {
-  font-size: 0.68rem;
+.game-grid .player-seat-1 .card-rank,
+.game-grid .player-seat-3 .card-rank {
+  font-size: 0.82rem;
 }
 
 .game-grid .seat-title span {
@@ -1140,6 +1192,41 @@ p {
 .table-decision-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.missing-seat-overlay {
+  position: absolute;
+  z-index: 8;
+  top: 50%;
+  left: 50%;
+  width: min(24rem, 82%);
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid rgba(255, 251, 232, 0.34);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel-solid) 95%, transparent);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.3);
+  padding: 1rem;
+}
+
+.missing-seat-overlay h2 {
+  color: var(--ink);
+  font-size: 1.24rem;
+  line-height: 1.05;
+}
+
+.missing-seat-overlay p:not(.eyebrow) {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 780;
+  line-height: 1.35;
+}
+
+.missing-seat-actions {
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.55rem;
 }
 
@@ -1207,19 +1294,19 @@ p {
 .center-trick-1 {
   top: 50%;
   left: 0;
-  transform: translateY(-50%) rotate(-90deg);
+  transform: translateY(-50%);
 }
 
 .center-trick-2 {
   bottom: 0;
   left: 50%;
-  transform: translateX(-50%) rotate(180deg);
+  transform: translateX(-50%);
 }
 
 .center-trick-3 {
   top: 50%;
   right: 0;
-  transform: translateY(-50%) rotate(90deg);
+  transform: translateY(-50%);
 }
 
 .lift-capture-animation {
@@ -1680,8 +1767,8 @@ p {
   }
 
   .playing-room-shell .kick-card-strip .playing-card {
-    width: 2.25rem;
-    height: 3.05rem;
+    width: 2.4rem;
+    height: 3.2rem;
     font-size: 0.72rem;
   }
 
@@ -1818,6 +1905,7 @@ p {
   .player-seat-3,
   .table-center,
   .table-decision-prompt,
+  .missing-seat-overlay,
   .round-summary-overlay,
   .game-over-callout,
   .waiting-status-banner {
@@ -1834,6 +1922,10 @@ p {
   }
 
   .table-decision-prompt {
+    order: -1;
+  }
+
+  .missing-seat-overlay {
     order: -1;
   }
 
@@ -2098,38 +2190,49 @@ p {
   }
 
   .playing-room-shell .playing-card {
-    width: 1.8rem;
-    height: 2.48rem;
-    padding: 0.16rem;
-    font-size: 0.56rem;
+    width: 2.05rem;
+    height: 2.86rem;
+    padding: 0.14rem;
+    font-size: 0.62rem;
   }
 
   .playing-room-shell .playing-card.small-card {
-    width: 1.42rem;
-    height: 1.95rem;
+    width: 1.55rem;
+    height: 2.14rem;
     font-size: 0.5rem;
   }
 
-  .playing-room-shell .card-corner {
-    font-size: 0.42rem;
+  .playing-room-shell .playing-card.table-card {
+    width: 2.08rem;
+    height: 2.86rem;
   }
 
-  .playing-room-shell .card-corner strong {
-    font-size: 0.5rem;
+  .playing-room-shell .card-face {
+    gap: 0.06rem;
   }
 
-  .playing-room-shell .top-corner {
-    top: 0.14rem;
-    left: 0.14rem;
+  .playing-room-shell .card-rank {
+    font-size: 0.78rem;
   }
 
-  .playing-room-shell .bottom-corner {
-    right: 0.14rem;
-    bottom: 0.14rem;
+  .playing-room-shell .small-card .card-rank {
+    font-size: 0.58rem;
   }
 
   .playing-room-shell .card-suit-main {
+    font-size: 1.22rem;
+  }
+
+  .playing-room-shell .small-card .card-suit-main {
     font-size: 0.94rem;
+  }
+
+  .playing-room-shell .table-card .card-rank {
+    font-size: 0.74rem;
+  }
+
+  .playing-room-shell .table-card .card-suit-main {
+    font-size: 1.22rem;
   }
 
   .playing-room-shell .table-center {
@@ -2145,7 +2248,7 @@ p {
     position: absolute;
     inset: 0;
     display: grid;
-    grid-template-columns: minmax(4.35rem, max-content) minmax(7rem, 1fr) minmax(4.35rem, max-content);
+    grid-template-columns: minmax(4.8rem, max-content) minmax(7.4rem, 1fr) minmax(4.8rem, max-content);
     grid-template-rows: auto minmax(8.5rem, 1fr) auto;
     gap: 0.24rem;
     align-items: center;
@@ -2185,7 +2288,7 @@ p {
   .playing-room-shell .game-grid .player-seat-1,
   .playing-room-shell .game-grid .player-seat-3 {
     grid-row: 2;
-    width: min(4.85rem, 24vw);
+    width: min(5.25rem, 25vw);
     max-height: 100%;
   }
 
@@ -2197,6 +2300,11 @@ p {
   .playing-room-shell .game-grid .player-seat-3 {
     grid-column: 3;
     justify-self: end;
+  }
+
+  .playing-room-shell .game-grid .player-seat-1 .seat-title small,
+  .playing-room-shell .game-grid .player-seat-3 .seat-title small {
+    display: none;
   }
 
   .playing-room-shell .game-grid .player-seat-0 .hand-row,
@@ -2237,6 +2345,7 @@ p {
   }
 
   .playing-room-shell .table-decision-prompt,
+  .playing-room-shell .missing-seat-overlay,
   .playing-room-shell .round-summary-overlay,
   .playing-room-shell .game-over-callout,
   .playing-room-shell .waiting-status-banner {
@@ -2247,6 +2356,7 @@ p {
   }
 
   .playing-room-shell .table-decision-prompt,
+  .playing-room-shell .missing-seat-overlay,
   .playing-room-shell .round-summary-overlay,
   .playing-room-shell .game-over-callout {
     top: 50%;

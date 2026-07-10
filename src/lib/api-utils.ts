@@ -67,6 +67,8 @@ export function parseRoomAction(value: unknown): RoomAction {
   switch (action.type) {
     case "choose-seat":
       return { type: "choose-seat", seat: asSeat(action.seat) };
+    case "leave-seat":
+      return { type: "leave-seat" };
     case "add-bot":
       return { type: "add-bot", seat: asSeat(action.seat) };
     case "remove-bot":

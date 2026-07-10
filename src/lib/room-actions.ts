@@ -31,7 +31,9 @@ import {
 } from "@/types/game";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const PLAYER_DISCONNECT_MS = 45_000;
 const BOT_NAMES = ["Anansi", "Calypso", "Moko", "Soca"];
+const TABLE_SEATS: Seat[] = [0, 1, 2, 3];
 
 export function ttlFrom(now: string): string {
   return new Date(Date.parse(now) + DAY_MS).toISOString();
@@ -163,9 +165,114 @@ function assertCommonCall(call: CommonCall): void {
   }
 }
 
+function isSeat(seat: Seat | null): seat is Seat {
+  return seat !== null;
+}
+
 function seatsAreReady(room: RoomDoc): boolean {
-  const occupied = new Set(room.players.map((player) => player.seat).filter((seat) => seat !== null));
+  const occupied = new Set(room.players.map((player) => player.seat).filter(isSeat));
   return occupied.size === 4;
+}
+
+function occupiedSeats(room: RoomDoc): Set<Seat> {
+  return new Set(room.players.map((player) => player.seat).filter(isSeat));
+}
+
+function seatOccupant(room: RoomDoc, seat: Seat): PlayerRecord | undefined {
+  return room.players.find((candidate) => candidate.seat === seat);
+}
+
+export function missingGameSeats(room: RoomDoc): Seat[] {
+  if (room.status !== "playing" || !room.game || room.game.phase === "game-over") return [];
+  const occupied = occupiedSeats(room);
+  return TABLE_SEATS.filter((seat) => !occupied.has(seat));
+}
+
+function gameHasMissingSeats(room: RoomDoc): boolean {
+  return missingGameSeats(room).length > 0;
+}
+
+function pushPlayerLeftEvent(room: RoomDoc, now: string, player: PlayerRecord, seat: Seat): void {
+  pushEvent(room, now, {
+    type: "system",
+    seat,
+    message: `${player.name} left Seat ${seat + 1}. Waiting for someone to take the seat.`
+  });
+}
+
+function maybeTransferHost(room: RoomDoc, player: PlayerRecord, now: string): void {
+  if (player.isHost) return;
+  const seatedHost = room.players.find((candidate) => candidate.isHost && candidate.seat !== null);
+  if (seatedHost) return;
+
+  const oldHost = room.players.find((candidate) => candidate.id === room.hostPlayerId);
+  if (oldHost) oldHost.isHost = false;
+  player.isHost = true;
+  room.hostPlayerId = player.id;
+  pushEvent(room, now, {
+    type: "system",
+    seat: player.seat ?? undefined,
+    message: `${player.name} is now the host.`
+  });
+}
+
+function restoreReturningPlayer(room: RoomDoc, player: PlayerRecord, now: string): boolean {
+  if (room.status !== "playing" || player.seat !== null || player.leftSeat === null || player.leftSeat === undefined) return false;
+  if (seatOccupant(room, player.leftSeat)) return false;
+
+  player.seat = player.leftSeat;
+  player.leftSeat = null;
+  maybeTransferHost(room, player, now);
+  pushEvent(room, now, {
+    type: "system",
+    seat: player.seat,
+    message: `${player.name} rejoined Seat ${player.seat + 1}.`
+  });
+  return true;
+}
+
+export function refreshRoomPresence(sourceRoom: RoomDoc, playerId: string, now: string): RoomDoc {
+  const room = cloneRoom(sourceRoom);
+  const currentPlayer = room.players.find((candidate) => candidate.id === playerId);
+  if (!currentPlayer) throw new Error("Player is not in this room.");
+
+  currentPlayer.lastSeenAt = now;
+  restoreReturningPlayer(room, currentPlayer, now);
+
+  if (room.status === "playing") {
+    for (const player of room.players) {
+      if (player.id === currentPlayer.id || player.isBot || player.seat === null) continue;
+      if (Date.parse(now) - Date.parse(player.lastSeenAt) <= PLAYER_DISCONNECT_MS) continue;
+
+      const seat = player.seat;
+      player.seat = null;
+      player.leftSeat = seat;
+      pushPlayerLeftEvent(room, now, player, seat);
+    }
+  }
+
+  touch(room, now);
+  return room;
+}
+
+export function markInactivePlayersLeft(sourceRoom: RoomDoc, now: string): RoomDoc {
+  const room = cloneRoom(sourceRoom);
+  if (room.status !== "playing") return room;
+
+  let changed = false;
+  for (const player of room.players) {
+    if (player.isBot || player.seat === null) continue;
+    if (Date.parse(now) - Date.parse(player.lastSeenAt) <= PLAYER_DISCONNECT_MS) continue;
+
+    const seat = player.seat;
+    player.seat = null;
+    player.leftSeat = seat;
+    pushPlayerLeftEvent(room, now, player, seat);
+    changed = true;
+  }
+
+  if (changed) touch(room, now);
+  return room;
 }
 
 function canSeeOwnHand(game: NonNullable<RoomDoc["game"]>, seat: Seat): boolean {
@@ -201,12 +308,19 @@ export function applyRoomAction(
     throw new Error("This room has ended.");
   }
 
+  if (gameHasMissingSeats(room) && action.type !== "choose-seat" && action.type !== "leave-seat") {
+    throw new Error("The game is paused until every seat is filled.");
+  }
+
   switch (action.type) {
     case "choose-seat": {
-      if (room.status !== "lobby") throw new Error("Seats are locked after the game starts.");
+      if (room.status === "playing" && player.seat !== null) throw new Error("Seats are locked after the game starts.");
+      if (room.status !== "lobby" && room.status !== "playing") throw new Error("Seats are locked after the game starts.");
       const seatTaken = room.players.some((candidate) => candidate.id !== player.id && candidate.seat === action.seat);
       if (seatTaken) throw new Error("That seat is already taken.");
       player.seat = action.seat;
+      player.leftSeat = null;
+      maybeTransferHost(room, player, now);
       pushEvent(room, now, {
         type: "system",
         seat: action.seat,
@@ -215,10 +329,27 @@ export function applyRoomAction(
       break;
     }
 
+    case "leave-seat": {
+      if (player.seat === null) break;
+      const seat = player.seat;
+      player.seat = null;
+      player.leftSeat = seat;
+      if (room.status === "playing") {
+        pushPlayerLeftEvent(room, now, player, seat);
+      } else {
+        pushEvent(room, now, {
+          type: "system",
+          seat,
+          message: `${player.name} left Seat ${seat + 1}.`
+        });
+      }
+      break;
+    }
+
     case "add-bot": {
       requireHost(room, player);
       if (room.status !== "lobby") throw new Error("Bots can only be added before the game starts.");
-      if (room.players.length >= 4) throw new Error("This room is full.");
+      if (seatsAreReady(room)) throw new Error("This room is full.");
       const seatTaken = room.players.some((candidate) => candidate.seat === action.seat);
       if (seatTaken) throw new Error("That seat is already taken.");
       const botIndex = room.players.filter((candidate) => candidate.isBot).length;
@@ -418,6 +549,7 @@ function cardPlayPaused(room: RoomDoc, now: string): boolean {
 }
 
 export function roomNeedsAutomation(room: RoomDoc, now: string): boolean {
+  if (gameHasMissingSeats(room)) return false;
   const settlingTrick = room.game?.settlingTrick;
   return Boolean(
     (settlingTrick && Date.parse(settlingTrick.resolveAt) <= Date.parse(now)) ||
@@ -427,6 +559,7 @@ export function roomNeedsAutomation(room: RoomDoc, now: string): boolean {
 
 export function advanceRoom(sourceRoom: RoomDoc, now: string, random = Math.random): RoomDoc {
   let room = cloneRoom(sourceRoom);
+  if (gameHasMissingSeats(room)) return room;
   settleReadyTrick(room, now, random);
 
   for (let step = 0; step < 80; step += 1) {
@@ -483,10 +616,11 @@ export function sanitizeRoomForPlayer(room: RoomDoc, playerId: string): Sanitize
   const players = publicPlayers(room);
   const game = room.game;
   const seat = player.seat;
+  const gamePausedForMissingSeat = gameHasMissingSeats(room);
   const myHand = game && seat !== null && canSeeOwnHand(game, seat) ? sortCards(cloneCards(game.hands[seat])) : [];
   const teammateHand = game && seat !== null ? sortVisiblePartnerHand(game, seat) : null;
   const legalCardIds =
-    game && seat !== null ? legalCardsForSeat(game, seat, room.variants).map((card) => card.id) : [];
+    game && seat !== null && !gamePausedForMissingSeat ? legalCardsForSeat(game, seat, room.variants).map((card) => card.id) : [];
   const gamePoints = game ? currentGamePoints(game) : ([0, 0] as [number, number]);
 
   const seats: PublicSeat[] = ([0, 1, 2, 3] as Seat[]).map((seatNumber) => ({
@@ -563,6 +697,8 @@ function buildAvailableActions(room: RoomDoc, player: PlayerRecord): PublicActio
     }
     return actions;
   }
+
+  if (gameHasMissingSeats(room)) return actions;
 
   const game = room.game;
   if (!game || player.seat === null) return actions;

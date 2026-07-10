@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ApiError, cleanName, cleanRoomToken, jsonError, readJson, resolveParams } from "@/lib/api-utils";
-import { createGuestPlayer, sanitizeRoomForPlayer } from "@/lib/room-actions";
+import { createGuestPlayer, markInactivePlayersLeft, missingGameSeats, sanitizeRoomForPlayer } from "@/lib/room-actions";
 import { getRoomStore } from "@/lib/room-store";
 import { makePlayerId, makePlayerSecret } from "@/lib/security";
 
@@ -22,18 +22,26 @@ export async function POST(request: Request, context: RouteContext): Promise<Nex
     const guest = createGuestPlayer(playerId, name, playerSecret, now);
 
     const room = await getRoomStore().updateRoom(roomToken, (current) => {
-      if (current.status !== "lobby") throw new ApiError("This game has already started.", 409);
-      if (current.players.length >= 4) throw new ApiError("This room is full.", 409);
-      current.players.push(guest);
-      current.updatedAt = now;
-      current.expiresAt = new Date(Date.parse(now) + 24 * 60 * 60 * 1000).toISOString();
-      current.events.push({
+      const roomWithPresence = markInactivePlayersLeft(current, now);
+      const occupiedSeats = new Set(roomWithPresence.players.flatMap((player) => (player.seat === null ? [] : [player.seat])));
+      if (roomWithPresence.status === "playing" && missingGameSeats(roomWithPresence).length === 0) {
+        throw new ApiError("This game is already full.", 409);
+      }
+      if (roomWithPresence.status !== "lobby" && roomWithPresence.status !== "playing") {
+        throw new ApiError("This game has already started.", 409);
+      }
+      if (roomWithPresence.status === "lobby" && occupiedSeats.size >= 4) throw new ApiError("This room is full.", 409);
+
+      roomWithPresence.players.push(guest);
+      roomWithPresence.updatedAt = now;
+      roomWithPresence.expiresAt = new Date(Date.parse(now) + 24 * 60 * 60 * 1000).toISOString();
+      roomWithPresence.events.push({
         id: `${Date.parse(now)}-join-${playerId}`,
         type: "system",
         at: now,
         message: `${name} joined the room.`
       });
-      return current;
+      return roomWithPresence;
     });
 
     return NextResponse.json({

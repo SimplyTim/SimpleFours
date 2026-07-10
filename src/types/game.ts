@@ -31,6 +31,7 @@ export interface PlayerRecord {
   isHost: boolean;
   isBot?: boolean;
   seat: Seat | null;
+  leftSeat?: Seat | null;
   joinedAt: string;
   lastSeenAt: string;
 }
@@ -155,6 +156,7 @@ export interface RoomDoc {
 
 export type RoomAction =
   | { type: "choose-seat"; seat: Seat }
+  | { type: "leave-seat" }
   | { type: "add-bot"; seat: Seat }
   | { type: "remove-bot"; seat: Seat }
   | { type: "update-variants"; variants: Partial<RoomVariants> }
