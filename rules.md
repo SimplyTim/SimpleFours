@@ -56,7 +56,7 @@ They may say:
 
 If the player begs, the dealer has two choices:
 
-1. **Take one**
+1. **Give one**
    The dealer keeps the original trump suit, and the opposing team gets 1 point.
 
 2. **Run the cards**
@@ -67,7 +67,7 @@ When running the cards:
 * If the new kick is a different suit, that suit becomes trump.
 * If the new kick is the same suit, the dealer deals 3 more cards again and kicks another card.
 * The dealer’s team still scores any kicking points earned while running the cards.
-* If the deck runs out before a new trump suit appears, the hand is usually thrown in and redealt. If points were kicked at any point, the dealer may "pass the pack" to the person tp their right, making them the new dealer, or forgo the points and deal again. 
+* If the deck runs out before a new trump suit appears, the hand is usually thrown in and redealt. If points were kicked at any point, the dealer may "pass the pack" to the person to their right, making them the new dealer, or forgo the points and deal again. 
 
 ## Playing Tricks/Lifts
 
