@@ -186,7 +186,7 @@ This order matters because it decides who reaches 14 first.
 1. Deal 6 cards to each player.
 2. Dealer kicks a card to decide trump.
 3. Dealer scores kicking points if they kick Ace, 6, or Jack in Trinidad.
-4. In Tobago, dealer scores 2 points for kicking 2 instead of 6.
+4. In Tobago, dealer scores 2 points for kicking 2.
 5. Player to dealer’s right may stand or beg.
 6. Players play tricks anticlockwise.
 7. Score High, Low, Jack or Hang Jack, and Game.
